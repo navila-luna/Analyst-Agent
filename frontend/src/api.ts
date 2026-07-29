@@ -27,6 +27,32 @@ export async function askQuestion(question: string): Promise<AskResponse> {
   return response.json()
 }
 
+export interface BotConfig {
+  tone: string
+  answer_format: string
+  require_citations: boolean
+}
+
+export async function getConfig(): Promise<BotConfig> {
+  const response = await fetch(`${API_BASE_URL}/config`)
+  if (!response.ok) {
+    throw new Error(`Request failed: ${response.status}`)
+  }
+  return response.json()
+}
+
+export async function updateConfig(config: BotConfig): Promise<BotConfig> {
+  const response = await fetch(`${API_BASE_URL}/config`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  })
+  if (!response.ok) {
+    throw new Error(`Request failed: ${response.status}`)
+  }
+  return response.json()
+}
+
 export interface IndexResult {
   files_new: string[]
   files_changed: string[]

@@ -3,7 +3,10 @@ from dataclasses import dataclass
 from dotenv import load_dotenv
 from openai import OpenAI
 
+from app.config_store import get_or_create_config
+from app.db import SessionLocal
 from app.index import query
+from app.models import BotConfig
 
 load_dotenv()
 client = OpenAI()
@@ -14,11 +17,19 @@ DISTANCE_THRESHOLD = 0.6
 
 NOT_IN_DOCS_MESSAGE = "I don't know — the provided documents don't cover this."
 
-SYSTEM_PROMPT = (
-    "You are a helpful assistant that answers questions using only the provided "
-    "context. Cite sources inline using [n] matching the numbered context blocks. "
-    "If the context doesn't contain the answer, say you don't know."
-)
+
+def build_system_prompt(config: BotConfig) -> str:
+    citation_instruction = (
+        "Cite sources inline using [n] matching the numbered context blocks."
+        if config.require_citations
+        else "Do not include citations or reference numbers in your answer."
+    )
+    return (
+        f"You are a helpful assistant that answers questions using only the "
+        f"provided context. Respond in a {config.tone} tone, formatted as "
+        f"{config.answer_format}. {citation_instruction} "
+        "If the context doesn't contain the answer, say you don't know."
+    )
 
 
 @dataclass
@@ -50,10 +61,14 @@ def ask(question: str, top_k: int = 5) -> Answer:
     if not distances or min(distances) > DISTANCE_THRESHOLD:
         return Answer(text=NOT_IN_DOCS_MESSAGE, references=[], in_docs=False)
 
+    with SessionLocal() as db:
+        config = get_or_create_config(db)
+        system_prompt = build_system_prompt(config)
+
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": build_prompt(question, chunks)},
         ],
     )
