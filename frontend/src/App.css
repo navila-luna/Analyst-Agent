@@ -37,11 +37,44 @@
   max-width: 75%;
   padding: 0.6rem 0.9rem;
   border-radius: 16px;
-  white-space: pre-wrap;
+  text-align: left;
 }
 
 .bubble p {
-  margin: 0;
+  margin: 0 0 0.6rem;
+  white-space: pre-wrap;
+}
+
+.bubble ul,
+.bubble ol {
+  margin: 0 0 0.6rem;
+  padding-left: 1.3rem;
+}
+
+.bubble li {
+  margin-bottom: 0.25rem;
+}
+
+.bubble li:last-child {
+  margin-bottom: 0;
+}
+
+.bubble code {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.85em;
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.12);
+  color: #1a1a1a;
+}
+
+.bubble.user code {
+  background: rgba(255, 255, 255, 0.25);
+  color: white;
+}
+
+.bubble > *:last-child {
+  margin-bottom: 0;
 }
 
 .bubble.user {

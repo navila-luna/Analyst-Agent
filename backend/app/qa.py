@@ -18,6 +18,20 @@ DISTANCE_THRESHOLD = 0.6
 NOT_IN_DOCS_MESSAGE = "I don't know — the provided documents don't cover this."
 
 
+def build_format_instruction(answer_format: str) -> str:
+    if answer_format == "bullet points":
+        return (
+            "When the answer covers multiple distinct steps, items, or facts, "
+            "format it as a markdown bullet list. If the answer is a single "
+            "short point, just write one concise sentence instead - don't force "
+            "a list onto content that doesn't need one."
+        )
+    return (
+        "Write the answer as flowing prose in complete sentences. Do not use "
+        "bullet points or numbered lists."
+    )
+
+
 def build_system_prompt(config: BotConfig) -> str:
     citation_instruction = (
         "Cite sources inline using [n] matching the numbered context blocks."
@@ -26,8 +40,8 @@ def build_system_prompt(config: BotConfig) -> str:
     )
     return (
         f"You are a helpful assistant that answers questions using only the "
-        f"provided context. Respond in a {config.tone} tone, formatted as "
-        f"{config.answer_format}. {citation_instruction} "
+        f"provided context. Respond in a {config.tone} tone. "
+        f"{build_format_instruction(config.answer_format)} {citation_instruction} "
         "If the context doesn't contain the answer, say you don't know."
     )
 

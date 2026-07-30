@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import ReactMarkdown from 'react-markdown'
 import { askQuestion, type Reference } from '../api'
 
 interface Message {
@@ -52,7 +53,11 @@ export function Chat() {
         {messages.map((message) => (
           <div key={message.id} className={`bubble-row ${message.role}`}>
             <div className={`bubble ${message.role} ${message.isError ? 'error-bubble' : ''}`}>
-              <p>{message.text}</p>
+              {message.role === 'assistant' && !message.isError ? (
+                <ReactMarkdown>{message.text}</ReactMarkdown>
+              ) : (
+                <p>{message.text}</p>
+              )}
 
               {message.references && message.references.length > 0 && (
                 <div className="references">
