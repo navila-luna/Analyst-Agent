@@ -13,7 +13,10 @@ client = OpenAI()
 
 # Cosine distance: 0 = identical, 2 = opposite. Anything worse than this is
 # treated as "not actually in the docs" and short-circuits before the LLM call.
-DISTANCE_THRESHOLD = 0.6
+# 0.6 was an initial guess with almost no margin (a correct, well-matched
+# answer scored 0.56-0.62 in testing); bumped to 0.75 as a pragmatic patch.
+# Needs real tuning via the Phase 6 eval pipeline, not another guess.
+DISTANCE_THRESHOLD = 0.75
 
 NOT_IN_DOCS_MESSAGE = "I don't know — the provided documents don't cover this."
 

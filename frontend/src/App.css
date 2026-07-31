@@ -41,22 +41,63 @@
 }
 
 .bubble p {
-  margin: 0 0 0.6rem;
+  margin: 0 0 0.9rem;
+  line-height: 1.55;
   white-space: pre-wrap;
 }
 
 .bubble ul,
 .bubble ol {
-  margin: 0 0 0.6rem;
-  padding-left: 1.3rem;
+  margin: 0 0 0.9rem;
+  padding-left: 1.4rem;
 }
 
 .bubble li {
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.4rem;
+  line-height: 1.5;
 }
 
 .bubble li:last-child {
   margin-bottom: 0;
+}
+
+.bubble h1,
+.bubble h2,
+.bubble h3 {
+  margin: 0 0 0.6rem;
+  line-height: 1.3;
+  font-weight: 700;
+}
+
+.bubble h1 {
+  font-size: 1.25em;
+}
+
+.bubble h2 {
+  font-size: 1.15em;
+}
+
+.bubble h3 {
+  font-size: 1.05em;
+}
+
+.bubble strong {
+  font-weight: 700;
+}
+
+.bubble blockquote {
+  margin: 0 0 0.9rem;
+  padding: 0.1rem 0 0.1rem 0.9rem;
+  border-left: 3px solid rgba(0, 0, 0, 0.2);
+}
+
+.bubble.user blockquote {
+  border-left-color: rgba(255, 255, 255, 0.5);
+}
+
+.bubble blockquote p {
+  margin-bottom: 0;
+  font-weight: 600;
 }
 
 .bubble code {
