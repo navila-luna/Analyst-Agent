@@ -57,6 +57,13 @@ def index_folder(folder: Path) -> dict:
 
         # Only diff against previous chunk hashes for these same files, so
         # untouched files' chunks aren't mistaken for "deleted".
+        #
+        # Scalability: every chunk hash lives in one dict under a key like
+        # "file.md::3" - there's no way to grab "just this file's chunks"
+        # without scanning all of them. So this scan (and the two below) cost
+        # O(total corpus), not O(files_to_process). A dict per file would fix
+        # that; revisit at Phase 7 (scale/deployment) if it becomes real
+        # latency.
         old_chunk_hashes = {
             cid: h for cid, h in manifest.chunks.items()
             if cid.split("::", 1)[0] in files_to_process
@@ -79,6 +86,7 @@ def index_folder(folder: Path) -> dict:
             collection.upsert(ids=ids, embeddings=embeddings, documents=texts, metadatas=metadatas)
         chunks_embedded = len(chunks_to_embed)
 
+        # Same flat-key scan cost as old_chunk_hashes above.
         new_chunk_manifest = {
             cid: h for cid, h in new_chunk_manifest.items()
             if cid.split("::", 1)[0] not in files_to_process
@@ -86,6 +94,7 @@ def index_folder(folder: Path) -> dict:
         new_chunk_manifest.update(current_chunk_hashes)
 
     if file_diff.deleted:
+        # Same flat-key scan cost as old_chunk_hashes above.
         deleted_set = set(file_diff.deleted)
         new_chunk_manifest = {
             cid: h for cid, h in new_chunk_manifest.items()

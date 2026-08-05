@@ -5,6 +5,11 @@ A RAG (Retrieval-Augmented Generation) knowledge bot: upload your team's docs,
 ask questions in a chat UI, and get answers grounded in those docs with source
 citations. See [PLAN.md](PLAN.md) for the full design and phased build plan.
 
+New to this codebase? [BACKEND_WALKTHROUGH.md](BACKEND_WALKTHROUGH.md) is a
+guide to how to approach reading the backend/RAG pipeline — what order to
+read files in and how to think about evaluating RAG decisions — rather than
+a line-by-line tour.
+
 ## Prerequisites
 
 - **Python 3.11+**
@@ -12,6 +17,12 @@ citations. See [PLAN.md](PLAN.md) for the full design and phased build plan.
 - **Homebrew** (macOS) — used to install Postgres
 - **PostgreSQL 16** — installed via Homebrew (see setup below)
 - An **OpenAI API key** — used for answer generation
+
+## Before you begin: `.env` and `.gitignore`
+
+`.env` holds your personal secrets (your API key, your database address). `.gitignore` tells git to never commit that file, so your secrets never end up on GitHub. That's the whole idea — if you want the deeper why, [GitHub's guide to ignoring files](https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files) covers it well.
+
+Setup step 2 below walks you through creating your `.env` and includes a quick check to confirm it's actually being ignored before you commit anything.
 
 ## Setup
 
@@ -31,6 +42,11 @@ python3 -m venv .venv
 ./.venv/bin/pip install -r requirements.txt
 ```
 
+Don't have an OpenAI API key yet? Get one at
+[platform.openai.com/api-keys](https://platform.openai.com/api-keys):
+log in (or create an account), click **Create new secret key**, then copy it
+immediately — OpenAI only shows it to you once.
+
 Copy the env template and fill in your real OpenAI API key:
 
 ```bash
@@ -39,6 +55,19 @@ cp .env.example .env
 
 Then edit `backend/.env` and replace `sk-...` with your actual `OPENAI_API_KEY`.
 `DATABASE_URL` is already set to the local Postgres database created above.
+
+**If you're new to git, check that it's actually being ignored** before you
+commit anything, by running this from the repo root:
+
+```bash
+git status
+```
+
+`backend/.env` should **not** appear anywhere in that output — not staged,
+not untracked, nothing. If it's simply missing from the list, that's correct;
+git is already ignoring it. If it ever *does* show up, stop — don't run
+`git add` on it or commit — and double check the file is actually named
+`.env` (not `.env.txt` or similar).
 
 ### 3. Frontend
 
