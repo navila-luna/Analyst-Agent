@@ -1,0 +1,104 @@
+[
+  {
+    "question": "How do I request a new AWS permission?",
+    "expected_answer": "File a ticket in the #infra-requests Slack channel with the specific IAM policy needed and your justification. Infra reviews requests daily.",
+    "expected_doc": "faq.md",
+    "answerable": true
+  },
+  {
+    "question": "Who owns the billing service?",
+    "expected_answer": "The Payments team owns `billing-service`. Reach them in #payments-team for any questions about its APIs or data model.",
+    "expected_doc": "faq.md",
+    "answerable": true
+  },
+  {
+    "question": "What should I do to get access to the team's private Slack channel?",
+    "expected_answer": "Ask your manager for access to the team's private Slack channel.",
+    "expected_doc": "onboarding.md",
+    "answerable": true
+  },
+  {
+    "question": "What is one of the goals for the first week of onboarding?",
+    "expected_answer": "Ship one small PR (doc fix or minor bug) by day 3.",
+    "expected_doc": "onboarding.md",
+    "answerable": true
+  },
+  {
+    "question": "How is a deployment triggered?",
+    "expected_answer": "Deploys are triggered by merging to `main`.",
+    "expected_doc": "runbook_deploy.md",
+    "answerable": true
+  },
+  {
+    "question": "What should I do if a deploy causes errors?",
+    "expected_answer": "Run `deploy rollback --service <name>` to revert to the previous known-good image.",
+    "expected_doc": "runbook_deploy.md",
+    "answerable": true
+  },
+  {
+    "question": "What's the capital of France?",
+    "expected_answer": null,
+    "expected_doc": null,
+    "answerable": false
+  },
+  {
+    "question": "What's our company's parental leave policy?",
+    "expected_answer": null,
+    "expected_doc": null,
+    "answerable": false
+  },
+  {
+    "question": "How do I set up a VPN connection?",
+    "expected_answer": null,
+    "expected_doc": null,
+    "answerable": false
+  },
+  {
+    "question": "What's the weather forecast for tomorrow?",
+    "expected_answer": null,
+    "expected_doc": null,
+    "answerable": false
+  },
+  {
+    "question": "Who is the CEO of our biggest competitor?",
+    "expected_answer": null,
+    "expected_doc": null,
+    "answerable": false
+  },
+  {
+    "question": "When will the conference be in France?",
+    "expected_answer": null,
+    "expected_doc": "ees_conference.md",
+    "answerable": false
+  },
+  {
+    "question": "Can I upload more than 1 resume for the EES Career Fair?",
+    "expected_answer": "No, for EES Fair, you can only submit one resume.",
+    "expected_doc": "ees_conference.md",
+    "answerable": true
+  },
+  {
+    "question": "What is the deadline to submit my resume for the EES Career Fair?",
+    "expected_answer": "The deadline to submit your resume for the EES Career Fair is September 12th.",
+    "expected_doc": "ees_conference.md",
+    "answerable": true
+  },
+  {
+    "question": "What if I can't make it to the EES Career Fair? Can I still meet recruiters?",
+    "expected_answer": "Your resume will be shared with employers as part of the CodePath resume book.",
+    "expected_doc": "ees_conference.md",
+    "answerable": true
+  },
+  {
+    "question": "When is the last day to make updates to my resume for the EES Career Fair?",
+    "expected_answer": "The last day to make updates to your resume for the EES Career Fair is September 18th.",
+    "expected_doc": "ees_conference.md",
+    "answerable": true
+  },
+  {
+    "question": "Who is eligible to attend the EES Career Summit?",
+    "expected_answer": "2021 and 2022 course completers and fall 2023 enrolled 101 students.",
+    "expected_doc": "ees_conference.md",
+    "answerable": true
+  }
+]

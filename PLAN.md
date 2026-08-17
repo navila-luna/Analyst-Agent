@@ -62,7 +62,9 @@ Ground-truth QA generation, LLM-as-judge, cosine similarity, reference
 precision/recall — closes the feedback loop shown in the system design diagram.
 
 ### Phase 7 (stretch)
-Auth, multi-user, OneDrive/SharePoint connectors, deployment, Pinecone swap-in.
+Auth, multi-user, OneDrive/SharePoint connectors, deployment, Pinecone swap-in,
+PDF support (text extraction, e.g. via `pypdf` - currently only `.md`/`.txt`
+are ingested; discovered while testing with a longer test document).
 
 ## Status
 - [x] Concept + system design (diagrams)
@@ -72,6 +74,6 @@ Auth, multi-user, OneDrive/SharePoint connectors, deployment, Pinecone swap-in.
 - [x] Phase 2
 - [x] Phase 3
 - [x] Phase 4
-- [ ] Phase 5
+- [x] Phase 5
 - [ ] Phase 6
 - [ ] Phase 7
