@@ -7,3 +7,4 @@ openai
 python-dotenv
 sqlalchemy
 psycopg[binary]
+mcp>=2,<3

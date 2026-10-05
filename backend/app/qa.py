@@ -7,6 +7,7 @@ from app.config_store import get_or_create_config
 from app.db import SessionLocal
 from app.index import query
 from app.models import BotConfig
+from app.scoring import cosine_distance_to_similarity
 
 load_dotenv()
 client = OpenAI()
@@ -96,7 +97,7 @@ def ask(question: str, top_k: int = 5) -> Answer:
             index=i + 1,
             doc_name=meta["doc_name"],
             chunk_index=meta["chunk_index"],
-            similarity=round(1 - dist, 2),
+            similarity=cosine_distance_to_similarity(dist),
         )
         for i, (meta, dist) in enumerate(zip(metadatas, distances))
     ]
