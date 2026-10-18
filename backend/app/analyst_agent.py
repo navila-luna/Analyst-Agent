@@ -1,6 +1,8 @@
 import json
+import logging
 from dataclasses import asdict, dataclass, field
 from typing import Any, Literal, Protocol
+from uuid import uuid4
 
 
 MAX_SEARCHES = 3
@@ -68,6 +70,20 @@ class AnalystAnswer:
     text: str
     evidence: list[Evidence]
     searches_performed: int
+    termination_reason: str
+
+
+@dataclass(frozen=True)
+class TraceEvent:
+    run_id: str
+    event: str
+    question: str
+    decision: str | None = None
+    search_iteration: int | None = None
+    search_query: str | None = None
+    result_count: int | None = None
+    results: list[dict[str, Any]] | None = None
+    termination_reason: str | None = None
 
 
 class AnalystModel(Protocol):
@@ -76,6 +92,18 @@ class AnalystModel(Protocol):
 
 class MCPClient(Protocol):
     async def call_tool(self, name: str, arguments: dict[str, Any] | None = None): ...
+
+
+class TraceRecorder(Protocol):
+    def record(self, event: TraceEvent) -> None: ...
+
+
+class LoggingTraceRecorder:
+    def __init__(self, logger: logging.Logger | None = None):
+        self.logger = logger or logging.getLogger("analyst_agent")
+
+    def record(self, event: TraceEvent) -> None:
+        self.logger.info(json.dumps(asdict(event)))
 
 
 class OpenAIAnalystModel:
@@ -133,37 +161,110 @@ class AnalystAgent:
         model: AnalystModel,
         mcp_client: MCPClient,
         max_searches: int = MAX_SEARCHES,
+        trace_recorder: TraceRecorder | None = None,
     ):
         self.model = model
         self.mcp_client = mcp_client
         self.max_searches = max_searches
+        self.trace_recorder = trace_recorder or LoggingTraceRecorder()
 
     async def run(self, question: str) -> AnalystAnswer:
         state = AgentState(question=question)
+        run_id = str(uuid4())
+        self._trace(TraceEvent(run_id, "run_started", question))
 
         while True:
             allow_search = state.search_iterations < self.max_searches
             decision = await self.model.decide(state, allow_search=allow_search)
+            self._trace(TraceEvent(
+                run_id,
+                "model_decision",
+                question,
+                decision=decision.action,
+                search_iteration=state.search_iterations,
+                search_query=decision.search_query,
+            ))
 
             if decision.action == "ANSWER":
                 if state.search_iterations and not state.evidence:
                     answer = INSUFFICIENT_EVIDENCE_MESSAGE
+                    reason = "no_evidence"
                 else:
                     answer = decision.answer or INSUFFICIENT_EVIDENCE_MESSAGE
-                return AnalystAnswer(answer, list(state.evidence), state.search_iterations)
+                    reason = "model_answered"
+                return self._finish(run_id, state, answer, reason)
 
             if not allow_search:
-                return AnalystAnswer(
+                return self._finish(
+                    run_id,
+                    state,
                     INSUFFICIENT_EVIDENCE_MESSAGE,
-                    list(state.evidence),
-                    state.search_iterations,
+                    "max_searches_reached",
                 )
 
             search_query = decision.search_query or state.question
-            evidence = await self._search_documents(search_query)
             state.searches.append(search_query)
+            search_iteration = state.search_iterations + 1
+            state.search_iterations = search_iteration
+            self._trace(TraceEvent(
+                run_id,
+                "search_started",
+                question,
+                decision="SEARCH",
+                search_iteration=search_iteration,
+                search_query=search_query,
+            ))
+            try:
+                evidence = await self._search_documents(search_query)
+            except Exception:
+                return self._finish(
+                    run_id,
+                    state,
+                    INSUFFICIENT_EVIDENCE_MESSAGE,
+                    "tool_error",
+                )
             state.evidence.extend(evidence)
-            state.search_iterations += 1
+            self._trace(TraceEvent(
+                run_id,
+                "retrieval_completed",
+                question,
+                decision="SEARCH",
+                search_iteration=search_iteration,
+                search_query=search_query,
+                result_count=len(evidence),
+                results=[
+                    {
+                        "doc_name": item.doc_name,
+                        "chunk_index": item.chunk_index,
+                        "similarity": item.similarity,
+                    }
+                    for item in evidence
+                ],
+            ))
+
+    def _finish(
+        self,
+        run_id: str,
+        state: AgentState,
+        answer: str,
+        reason: str,
+    ) -> AnalystAnswer:
+        self._trace(TraceEvent(
+            run_id,
+            "run_terminated",
+            state.question,
+            search_iteration=state.search_iterations,
+            termination_reason=reason,
+        ))
+        return AnalystAnswer(
+            answer,
+            list(state.evidence),
+            state.search_iterations,
+            reason,
+        )
+
+    def _trace(self, event: TraceEvent) -> None:
+        self.trace_recorder.record(event)
 
     async def _search_documents(self, question: str) -> list[Evidence]:
         result = await self.mcp_client.call_tool(

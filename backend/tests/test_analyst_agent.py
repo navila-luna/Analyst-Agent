@@ -34,6 +34,14 @@ class FakeModel:
         return self.decisions.pop(0)
 
 
+class FakeTraceRecorder:
+    def __init__(self):
+        self.events = []
+
+    def record(self, event):
+        self.events.append(event)
+
+
 def evidence(text="Relevant text", doc_name="guide.md", chunk_index=0, similarity=0.8):
     return {
         "text": text,
@@ -89,13 +97,23 @@ class AnalystAgentTests(unittest.IsolatedAsyncioTestCase):
             ModelDecision("SEARCH", search_query="four"),
         ])
         mcp = FakeMCPClient([[evidence()], [evidence()], [evidence()]])
+        recorder = FakeTraceRecorder()
 
-        result = await AnalystAgent(model, mcp).run("Question")
+        result = await AnalystAgent(
+            model,
+            mcp,
+            trace_recorder=recorder,
+        ).run("Question")
 
         self.assertEqual(result.searches_performed, 3)
         self.assertEqual(len(mcp.calls), 3)
         self.assertEqual(model.allow_search_values, [True, True, True, False])
         self.assertEqual(result.text, INSUFFICIENT_EVIDENCE_MESSAGE)
+        self.assertEqual(result.termination_reason, "max_searches_reached")
+        self.assertEqual(
+            recorder.events[-1].termination_reason,
+            "max_searches_reached",
+        )
 
     async def test_zero_results_returns_insufficient_evidence(self):
         model = FakeModel([
@@ -124,6 +142,78 @@ class AnalystAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.text, "Safe grounded answer.")
         self.assertEqual([call[0] for call in mcp.calls], ["search_documents"])
         self.assertEqual(result.evidence[0].text, malicious_text)
+
+    async def test_trace_records_metadata_without_document_text(self):
+        model = FakeModel([
+            ModelDecision("SEARCH", search_query="focused query"),
+            ModelDecision("ANSWER", answer="Grounded answer."),
+        ])
+        secret_text = "Sensitive document contents"
+        recorder = FakeTraceRecorder()
+        agent = AnalystAgent(
+            model,
+            FakeMCPClient([[
+                evidence(
+                    text=secret_text,
+                    doc_name="private.md",
+                    chunk_index=3,
+                    similarity=0.91,
+                )
+            ]]),
+            trace_recorder=recorder,
+        )
+
+        result = await agent.run("Original question")
+
+        retrieval = next(
+            event for event in recorder.events
+            if event.event == "retrieval_completed"
+        )
+        self.assertEqual(retrieval.question, "Original question")
+        self.assertEqual(retrieval.search_iteration, 1)
+        self.assertEqual(retrieval.search_query, "focused query")
+        self.assertEqual(retrieval.result_count, 1)
+        self.assertEqual(retrieval.results, [{
+            "doc_name": "private.md",
+            "chunk_index": 3,
+            "similarity": 0.91,
+        }])
+        self.assertNotIn(secret_text, repr(recorder.events))
+        self.assertEqual(result.termination_reason, "model_answered")
+
+    async def test_trace_records_no_evidence_termination(self):
+        recorder = FakeTraceRecorder()
+        agent = AnalystAgent(
+            FakeModel([
+                ModelDecision("SEARCH", search_query="missing"),
+                ModelDecision("ANSWER", answer="Unsupported"),
+            ]),
+            FakeMCPClient([[]]),
+            trace_recorder=recorder,
+        )
+
+        result = await agent.run("Question")
+
+        self.assertEqual(result.termination_reason, "no_evidence")
+        self.assertEqual(recorder.events[-1].termination_reason, "no_evidence")
+
+    async def test_trace_records_tool_error_termination(self):
+        class ErrorMCPClient:
+            async def call_tool(self, name, arguments=None):
+                return FakeToolResult({}, is_error=True)
+
+        recorder = FakeTraceRecorder()
+        agent = AnalystAgent(
+            FakeModel([ModelDecision("SEARCH", search_query="query")]),
+            ErrorMCPClient(),
+            trace_recorder=recorder,
+        )
+
+        result = await agent.run("Question")
+
+        self.assertEqual(result.termination_reason, "tool_error")
+        self.assertEqual(result.searches_performed, 1)
+        self.assertEqual(recorder.events[-1].termination_reason, "tool_error")
 
 
 if __name__ == "__main__":
