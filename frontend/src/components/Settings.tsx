@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getConfig, updateConfig, type BotConfig } from '../api'
 import { GearIcon } from '../icons'
 
 export function Settings() {
+  const settingsRef = useRef<HTMLDivElement>(null)
   const [isOpen, setIsOpen] = useState(false)
   const [config, setConfig] = useState<BotConfig | null>(null)
   const [saving, setSaving] = useState(false)
@@ -25,6 +26,24 @@ export function Settings() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!isOpen) return
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target
+
+      if (target instanceof Node && !settingsRef.current?.contains(target)) {
+        setIsOpen(false)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+    }
+  }, [isOpen])
+
   async function handleSave() {
     if (!config) return
     setSaving(true)
@@ -43,7 +62,7 @@ export function Settings() {
   }
 
   return (
-    <div className="settings-wrapper">
+    <div ref={settingsRef} className="settings-wrapper">
       <button
         type="button"
         className="settings-toggle"
