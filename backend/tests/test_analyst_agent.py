@@ -102,6 +102,7 @@ class AnalystAgentTests(unittest.IsolatedAsyncioTestCase):
         result = await AnalystAgent(
             model,
             mcp,
+            max_tool_calls=3,
             trace_recorder=recorder,
         ).run("Question")
 
@@ -109,10 +110,10 @@ class AnalystAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(mcp.calls), 3)
         self.assertEqual(model.allow_search_values, [True, True, True, False])
         self.assertEqual(result.text, INSUFFICIENT_EVIDENCE_MESSAGE)
-        self.assertEqual(result.termination_reason, "max_searches_reached")
+        self.assertEqual(result.termination_reason, "tool_limit_reached")
         self.assertEqual(
             recorder.events[-1].termination_reason,
-            "max_searches_reached",
+            "tool_limit_reached",
         )
 
     async def test_zero_results_returns_insufficient_evidence(self):
@@ -214,6 +215,77 @@ class AnalystAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.termination_reason, "tool_error")
         self.assertEqual(result.searches_performed, 1)
         self.assertEqual(recorder.events[-1].termination_reason, "tool_error")
+
+    async def test_lists_then_reads_document_for_broad_request(self):
+        model = FakeModel([
+            ModelDecision("LIST"),
+            ModelDecision("READ", doc_name="guide.md", start_chunk=0, max_chunks=2),
+            ModelDecision("ANSWER", answer="Document summary [guide.md, chunk 0]."),
+        ])
+        mcp = FakeMCPClient([
+            [{"doc_name": "guide.md", "size_bytes": 1000, "chunk_count": 2}],
+            {
+                "doc_name": "guide.md",
+                "total_chunks": 2,
+                "start_chunk": 0,
+                "chunks_returned": 2,
+                "next_chunk": None,
+                "has_more": False,
+                "chunks": [
+                    {"chunk_index": 0, "text": "First section"},
+                    {"chunk_index": 1, "text": "Second section"},
+                ],
+            },
+        ])
+
+        result = await AnalystAgent(model, mcp).run("Summarize the guide")
+
+        self.assertEqual([call[0] for call in mcp.calls], [
+            "list_documents",
+            "read_document",
+        ])
+        self.assertEqual(result.tool_calls_performed, 2)
+        self.assertEqual(result.searches_performed, 0)
+        self.assertEqual(len(result.evidence), 2)
+        self.assertIsNone(result.evidence[0].similarity)
+        self.assertEqual(result.evidence[0].source_method, "document_read")
+
+    async def test_read_request_is_clamped_to_maximum_chunks(self):
+        model = FakeModel([
+            ModelDecision("READ", doc_name="guide.md", max_chunks=500),
+            ModelDecision("ANSWER", answer="Summary"),
+        ])
+        mcp = FakeMCPClient([{
+            "doc_name": "guide.md",
+            "total_chunks": 0,
+            "start_chunk": 0,
+            "chunks_returned": 0,
+            "next_chunk": None,
+            "has_more": False,
+            "chunks": [],
+        }])
+
+        await AnalystAgent(model, mcp).run("Summarize guide.md")
+
+        self.assertEqual(mcp.calls[0][1]["max_chunks"], 10)
+
+    async def test_total_evidence_budget_keeps_complete_chunks(self):
+        model = FakeModel([
+            ModelDecision("SEARCH", search_query="query"),
+            ModelDecision("ANSWER", answer="Answer from available evidence"),
+        ])
+        mcp = FakeMCPClient([[
+            evidence(text="1234", chunk_index=0),
+            evidence(text="5678", chunk_index=1),
+        ]])
+
+        result = await AnalystAgent(
+            model,
+            mcp,
+            max_total_evidence_chars=5,
+        ).run("Question")
+
+        self.assertEqual([item.text for item in result.evidence], ["1234"])
 
 
 if __name__ == "__main__":

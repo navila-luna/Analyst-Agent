@@ -65,7 +65,11 @@ export function Chat() {
                   <ul>
                     {message.references.map((ref) => (
                       <li key={ref.index}>
-                        [{ref.index}] {ref.doc_name} (chunk {ref.chunk_index}, similarity={ref.similarity})
+                        [{ref.index}] {ref.doc_name} (chunk {ref.chunk_index}
+                        {ref.similarity === null
+                          ? ', direct document read'
+                          : `, similarity=${ref.similarity}`}
+                        )
                       </li>
                     ))}
                   </ul>

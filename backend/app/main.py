@@ -91,6 +91,9 @@ async def analyst_agent_v1_endpoint(
         "answer": result.text,
         "in_docs": bool(result.evidence),
         "references": references,
+        "searches_performed": result.searches_performed,
+        "tool_calls_performed": result.tool_calls_performed,
+        "termination_reason": result.termination_reason,
     }
 
 

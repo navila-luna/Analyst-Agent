@@ -51,6 +51,9 @@ class AnalystAgentAPITests(unittest.IsolatedAsyncioTestCase):
                 "chunk_index": 2,
                 "similarity": 0.87,
             }],
+            "searches_performed": 2,
+            "tool_calls_performed": 0,
+            "termination_reason": "model_answered",
         })
 
     async def test_agent_endpoint_reports_no_document_evidence(self):
