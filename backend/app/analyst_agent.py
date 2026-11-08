@@ -80,6 +80,10 @@ READ_DOCUMENT: read ordered chunks for summaries, comparisons, transformations,
 or other tasks requiring broad document coverage.
 ANSWER: respond when the available evidence is sufficient.
 
+For a focused factual question, use SEARCH_DOCUMENTS first. If a retrieved passage
+directly answers the question, answer immediately. Do not call LIST_DOCUMENTS or
+READ_DOCUMENT merely to verify evidence that already answers the question.
+
 For complete summaries, follow read_document pagination until the required document
 has been covered or the tool budget is exhausted. For comparisons, gather evidence
 from every named document. Every factual claim must be supported by evidence, but
@@ -279,6 +283,26 @@ class AnalystAgent:
             try:
                 await self._execute_tool(run_id, state, decision)
             except Exception:
+                logging.getLogger("analyst_agent").exception(
+                    "Agent tool failed during %s after %s tool calls",
+                    decision.action,
+                    len(state.tool_calls),
+                )
+                if state.evidence:
+                    try:
+                        fallback = await self.model.decide(state, allow_tools=False)
+                    except Exception:
+                        logging.getLogger("analyst_agent").exception(
+                            "Agent could not produce an answer from existing evidence"
+                        )
+                    else:
+                        if fallback.action == "ANSWER" and fallback.answer:
+                            return self._finish(
+                                run_id,
+                                state,
+                                fallback.answer,
+                                "tool_error_recovered",
+                            )
                 return self._finish(
                     run_id, state, INSUFFICIENT_EVIDENCE_MESSAGE, "tool_error"
                 )
@@ -359,6 +383,7 @@ class AnalystAgent:
             tool_iteration=len(state.tool_calls),
             search_iteration=len(state.searches) if name == "search_documents" else None,
             tool_name=name,
+            search_query=decision.search_query,
             result_count=len(payload) if name == "list_documents" else len(added),
             results=[
                 {
@@ -391,8 +416,13 @@ class AnalystAgent:
     def _structured_result(result):
         structured = getattr(result, "structured_content", None)
         if not isinstance(structured, dict):
-            return []
-        return structured.get("result", [])
+            raise ValueError("MCP tool returned invalid structured content")
+
+        # MCP tools returning a list may wrap it in a `result` property, while
+        # tools returning an object may expose that object directly.
+        if "result" in structured:
+            return structured["result"]
+        return structured
 
     def _finish(
         self, run_id: str, state: AgentState, answer: str, reason: str

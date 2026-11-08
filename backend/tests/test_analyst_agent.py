@@ -24,13 +24,21 @@ class FakeMCPClient:
         return FakeToolResult({"result": self.results.pop(0)})
 
 
+class DirectResultMCPClient:
+    def __init__(self, result):
+        self.result = result
+
+    async def call_tool(self, name, arguments=None):
+        return FakeToolResult(self.result)
+
+
 class FakeModel:
     def __init__(self, decisions):
         self.decisions = list(decisions)
         self.allow_search_values = []
 
-    async def decide(self, state, allow_search):
-        self.allow_search_values.append(allow_search)
+    async def decide(self, state, allow_tools):
+        self.allow_search_values.append(allow_tools)
         return self.decisions.pop(0)
 
 
@@ -216,6 +224,31 @@ class AnalystAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.searches_performed, 1)
         self.assertEqual(recorder.events[-1].termination_reason, "tool_error")
 
+    async def test_recovers_from_later_tool_error_using_existing_evidence(self):
+        class FailingAfterSearchMCPClient:
+            def __init__(self):
+                self.calls = 0
+
+            async def call_tool(self, name, arguments=None):
+                self.calls += 1
+                if self.calls == 1:
+                    return FakeToolResult({"result": [evidence()]})
+                raise RuntimeError("read failed")
+
+        model = FakeModel([
+            ModelDecision("SEARCH", search_query="focused question"),
+            ModelDecision("READ", doc_name="guide.md"),
+            ModelDecision("ANSWER", answer="Answer from search evidence."),
+        ])
+
+        result = await AnalystAgent(model, FailingAfterSearchMCPClient()).run(
+            "Original question"
+        )
+
+        self.assertEqual(result.text, "Answer from search evidence.")
+        self.assertEqual(result.termination_reason, "tool_error_recovered")
+        self.assertEqual(len(result.evidence), 1)
+
     async def test_lists_then_reads_document_for_broad_request(self):
         model = FakeModel([
             ModelDecision("LIST"),
@@ -249,6 +282,30 @@ class AnalystAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(result.evidence), 2)
         self.assertIsNone(result.evidence[0].similarity)
         self.assertEqual(result.evidence[0].source_method, "document_read")
+
+    async def test_accepts_direct_structured_content_from_read_document(self):
+        read_result = {
+            "doc_name": "guide.md",
+            "total_chunks": 1,
+            "start_chunk": 0,
+            "chunks_returned": 1,
+            "next_chunk": None,
+            "has_more": False,
+            "chunks": [{"chunk_index": 0, "text": "Direct result content"}],
+        }
+        model = FakeModel([
+            ModelDecision("READ", doc_name="guide.md", max_chunks=1),
+            ModelDecision("ANSWER", answer="Answer from direct content."),
+        ])
+
+        result = await AnalystAgent(
+            model,
+            DirectResultMCPClient(read_result),
+        ).run("Summarize guide.md")
+
+        self.assertEqual(result.text, "Answer from direct content.")
+        self.assertEqual(result.evidence[0].text, "Direct result content")
+        self.assertEqual(result.termination_reason, "model_answered")
 
     async def test_read_request_is_clamped_to_maximum_chunks(self):
         model = FakeModel([
