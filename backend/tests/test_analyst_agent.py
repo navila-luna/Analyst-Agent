@@ -1,3 +1,4 @@
+import json
 import unittest
 from dataclasses import dataclass
 
@@ -11,6 +12,18 @@ from app.analyst_agent import (
 @dataclass
 class FakeToolResult:
     structured_content: dict
+    is_error: bool = False
+
+
+@dataclass
+class FakeTextContent:
+    text: str
+
+
+@dataclass
+class FakeUnstructuredToolResult:
+    content: list[FakeTextContent]
+    structured_content: None = None
     is_error: bool = False
 
 
@@ -305,6 +318,36 @@ class AnalystAgentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.text, "Answer from direct content.")
         self.assertEqual(result.evidence[0].text, "Direct result content")
+        self.assertEqual(result.termination_reason, "model_answered")
+
+    async def test_accepts_json_text_content_from_read_document(self):
+        read_result = {
+            "doc_name": "guide.md",
+            "total_chunks": 1,
+            "start_chunk": 0,
+            "chunks_returned": 1,
+            "next_chunk": None,
+            "has_more": False,
+            "chunks": [{"chunk_index": 0, "text": "Text block content"}],
+        }
+
+        class TextContentMCPClient:
+            async def call_tool(self, name, arguments=None):
+                return FakeUnstructuredToolResult([
+                    FakeTextContent(json.dumps(read_result))
+                ])
+
+        model = FakeModel([
+            ModelDecision("READ", doc_name="guide.md", max_chunks=1),
+            ModelDecision("ANSWER", answer="Answer from text content."),
+        ])
+
+        result = await AnalystAgent(model, TextContentMCPClient()).run(
+            "Summarize guide.md"
+        )
+
+        self.assertEqual(result.text, "Answer from text content.")
+        self.assertEqual(result.evidence[0].text, "Text block content")
         self.assertEqual(result.termination_reason, "model_answered")
 
     async def test_read_request_is_clamped_to_maximum_chunks(self):

@@ -415,14 +415,31 @@ class AnalystAgent:
     @staticmethod
     def _structured_result(result):
         structured = getattr(result, "structured_content", None)
-        if not isinstance(structured, dict):
-            raise ValueError("MCP tool returned invalid structured content")
+        if isinstance(structured, dict):
+            # MCP tools returning a list may wrap it in a `result` property,
+            # while tools returning an object may expose that object directly.
+            if "result" in structured:
+                return structured["result"]
+            return structured
 
-        # MCP tools returning a list may wrap it in a `result` property, while
-        # tools returning an object may expose that object directly.
-        if "result" in structured:
-            return structured["result"]
-        return structured
+        # MCP tools without an output schema return JSON through TextContent
+        # blocks instead of structured_content. A dictionary produces one block;
+        # a list may produce one block per item.
+        decoded = []
+        for block in getattr(result, "content", []) or []:
+            text = getattr(block, "text", None)
+            if text is None:
+                continue
+            try:
+                decoded.append(json.loads(text))
+            except json.JSONDecodeError as error:
+                raise ValueError("MCP tool returned non-JSON text content") from error
+
+        if len(decoded) == 1:
+            return decoded[0]
+        if decoded:
+            return decoded
+        raise ValueError("MCP tool returned no usable content")
 
     def _finish(
         self, run_id: str, state: AgentState, answer: str, reason: str
