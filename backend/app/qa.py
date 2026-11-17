@@ -46,7 +46,13 @@ def build_system_prompt(config: BotConfig) -> str:
         f"You are a helpful assistant that answers questions using only the "
         f"provided context. Respond in a {config.tone} tone. "
         f"{build_format_instruction(config.answer_format)} {citation_instruction} "
-        "If the context doesn't contain the answer, say you don't know."
+        "Every factual claim must be supported by the provided context. You may "
+        "summarize, compare, synthesize, infer, or create original material when "
+        "the user requests it, provided the source facts and premises come from "
+        "the context. Clearly distinguish source-supported facts from your own "
+        "analysis or generated ideas. Do not introduce unsupported external facts. "
+        "If the context is insufficient for the requested task, explain what "
+        "information is missing instead of inventing it."
     )
 
 

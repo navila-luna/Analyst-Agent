@@ -4,17 +4,20 @@ export interface Reference {
   index: number
   doc_name: string
   chunk_index: number
-  similarity: number
+  similarity: number | null
 }
 
 export interface AskResponse {
   answer: string
   in_docs: boolean
   references: Reference[]
+  searches_performed?: number
+  tool_calls_performed?: number
+  termination_reason?: string
 }
 
 export async function askQuestion(question: string): Promise<AskResponse> {
-  const response = await fetch(`${API_BASE_URL}/ask`, {
+  const response = await fetch(`${API_BASE_URL}/analyst-agent/v1/ask`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ question }),
