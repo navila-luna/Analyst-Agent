@@ -1,13 +1,8 @@
 import json
 from dataclasses import asdict
-from app.agent.prompts import SYSTEM_PROMPT
-from app.agent.tool_definitions import TOOLS
-from app.document_repository import DEFAULT_CHUNKS_PER_READ
-from app.agent.constants import (
-    INSUFFICIENT_EVIDENCE_MESSAGE,
-    MAX_TOOL_CALLS,
-    MAX_TOTAL_EVIDENCE_CHARS,
-)
+
+from app.agent.constants import INSUFFICIENT_EVIDENCE_MESSAGE
+from app.agent.enums import AgentAction
 from app.agent.models import AgentState, ModelDecision
 from app.agent.prompts import SYSTEM_PROMPT
 from app.agent.tool_definitions import TOOLS
@@ -22,10 +17,13 @@ class OpenAIAnalystModel:
         state_payload = {
             "original_question": state.question,
             "tool_calls_already_performed": state.tool_calls,
-            "tool_calls_remaining": MAX_TOOL_CALLS - len(state.tool_calls),
+            "tool_calls_remaining": (
+                state.config.max_tool_calls - len(state.tool_calls)
+            ),
             "evidence_characters_used": state.evidence_chars,
             "evidence_characters_remaining": max(
-                0, MAX_TOTAL_EVIDENCE_CHARS - state.evidence_chars
+                0,
+                state.config.max_evidence_characters - state.evidence_chars,
             ),
             "available_documents": state.available_documents,
             "document_reads": state.document_reads,
@@ -52,9 +50,15 @@ class OpenAIAnalystModel:
         tool_calls = message.tool_calls or []
 
         if not tool_calls:
-            return ModelDecision(action="ANSWER", answer=(message.content or "").strip())
+            return ModelDecision(
+                action=AgentAction.ANSWER,
+                answer=(message.content or "").strip(),
+            )
         if not allow_tools or len(tool_calls) != 1:
-            return ModelDecision(action="ANSWER", answer=INSUFFICIENT_EVIDENCE_MESSAGE)
+            return ModelDecision(
+                action=AgentAction.ANSWER,
+                answer=INSUFFICIENT_EVIDENCE_MESSAGE,
+            )
 
         tool_call = tool_calls[0]
         arguments = json.loads(tool_call.function.arguments)
@@ -63,12 +67,15 @@ class OpenAIAnalystModel:
             search_query = arguments.get("question", "").strip()
             if not search_query:
                 raise ValueError("search_documents requires a non-empty question")
-            return ModelDecision(action="SEARCH", search_query=search_query)
+            return ModelDecision(
+                action=AgentAction.SEARCH,
+                search_query=search_query,
+            )
         if name == "list_documents":
-            return ModelDecision(action="LIST")
+            return ModelDecision(action=AgentAction.LIST)
         if name == "read_document":
             return ModelDecision(
-                action="READ",
+                action=AgentAction.READ,
                 doc_name=arguments.get("doc_name", "").strip(),
                 start_chunk=arguments.get("start_chunk", 0),
                 max_chunks=arguments.get("max_chunks", DEFAULT_CHUNKS_PER_READ),

@@ -2,6 +2,7 @@ import unittest
 
 from httpx import ASGITransport, AsyncClient
 
+from app.agent.enums import TerminationReason
 from app.agent.models import AnalystAnswer, Evidence
 from app.main import app, get_analyst_agent
 
@@ -35,7 +36,7 @@ class AnalystAgentAPITests(unittest.IsolatedAsyncioTestCase):
             text="Grounded answer.",
             evidence=[duplicate, duplicate],
             searches_performed=2,
-            termination_reason="model_answered",
+            termination_reason=TerminationReason.MODEL_ANSWERED,
         ))
 
         response = await self.post_question(agent, "How does this work?")
@@ -61,7 +62,7 @@ class AnalystAgentAPITests(unittest.IsolatedAsyncioTestCase):
             text="There is not enough evidence.",
             evidence=[],
             searches_performed=1,
-            termination_reason="no_evidence",
+            termination_reason=TerminationReason.NO_EVIDENCE,
         ))
 
         response = await self.post_question(agent, "Unknown topic")

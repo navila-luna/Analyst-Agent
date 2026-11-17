@@ -1,11 +1,9 @@
 import logging
 from uuid import uuid4
 
-from app.agent.constants import (
-    INSUFFICIENT_EVIDENCE_MESSAGE,
-    MAX_TOOL_CALLS,
-    MAX_TOTAL_EVIDENCE_CHARS,
-)
+from app.agent.config import AgentConfig
+from app.agent.constants import INSUFFICIENT_EVIDENCE_MESSAGE
+from app.agent.enums import AgentAction, TerminationReason
 from app.agent.models import (
     AgentState,
     AnalystAnswer,
@@ -26,25 +24,23 @@ class AnalystAgent:
         self,
         model: AnalystModel,
         mcp_client: MCPClient,
-        max_tool_calls: int = MAX_TOOL_CALLS,
-        max_total_evidence_chars: int = MAX_TOTAL_EVIDENCE_CHARS,
+        config: AgentConfig | None = None,
         trace_recorder: TraceRecorder | None = None,
     ):
         self.model = model
         self._tool_executor = ToolExecutor(mcp_client)
-        self.max_tool_calls = max_tool_calls
-        self.max_total_evidence_chars = max_total_evidence_chars
+        self._config = config or AgentConfig()
         self.trace_recorder = trace_recorder or LoggingTraceRecorder()
 
     async def run(self, question: str) -> AnalystAnswer:
-        state = AgentState(question=question)
+        state = AgentState(question=question, config=self._config)
         run_id = str(uuid4())
         self._trace(TraceEvent(run_id, "run_started", question))
 
         while True:
             allow_tools = (
-                len(state.tool_calls) < self.max_tool_calls
-                and state.evidence_chars < self.max_total_evidence_chars
+                len(state.tool_calls) < state.config.max_tool_calls
+                and state.evidence_chars < state.config.max_evidence_characters
             )
             decision = await self.model.decide(state, allow_tools)
             self._trace(TraceEvent(
@@ -56,19 +52,26 @@ class AnalystAgent:
                 search_query=decision.search_query,
             ))
 
-            if decision.action == "ANSWER":
+            if decision.action == AgentAction.ANSWER:
                 has_context = bool(state.evidence or state.available_documents)
                 if state.tool_calls and not has_context:
                     answer = INSUFFICIENT_EVIDENCE_MESSAGE
-                    reason = "no_evidence"
+                    reason = TerminationReason.NO_EVIDENCE
                 else:
                     answer = decision.answer or INSUFFICIENT_EVIDENCE_MESSAGE
-                    reason = "model_answered" if allow_tools else "tool_limit_reached"
+                    reason = (
+                        TerminationReason.MODEL_ANSWERED
+                        if allow_tools
+                        else TerminationReason.TOOL_LIMIT_REACHED
+                    )
                 return self._finish(run_id, state, answer, reason)
 
             if not allow_tools:
                 return self._finish(
-                    run_id, state, INSUFFICIENT_EVIDENCE_MESSAGE, "tool_limit_reached"
+                    run_id,
+                    state,
+                    INSUFFICIENT_EVIDENCE_MESSAGE,
+                    TerminationReason.TOOL_LIMIT_REACHED,
                 )
 
             try:
@@ -87,15 +90,21 @@ class AnalystAgent:
                             "Agent could not produce an answer from existing evidence"
                         )
                     else:
-                        if fallback.action == "ANSWER" and fallback.answer:
+                        if (
+                            fallback.action == AgentAction.ANSWER
+                            and fallback.answer
+                        ):
                             return self._finish(
                                 run_id,
                                 state,
                                 fallback.answer,
-                                "tool_error_recovered",
+                                TerminationReason.TOOL_ERROR_RECOVERED,
                             )
                 return self._finish(
-                    run_id, state, INSUFFICIENT_EVIDENCE_MESSAGE, "tool_error"
+                    run_id,
+                    state,
+                    INSUFFICIENT_EVIDENCE_MESSAGE,
+                    TerminationReason.TOOL_ERROR,
                 )
 
     async def _execute_tool(
@@ -180,7 +189,10 @@ class AnalystAgent:
             identifier = (item.doc_name, item.chunk_index)
             if identifier in existing:
                 continue
-            if state.evidence_chars + len(item.text) > self.max_total_evidence_chars:
+            if (
+                state.evidence_chars + len(item.text)
+                > state.config.max_evidence_characters
+            ):
                 break
             state.evidence.append(item)
             state.evidence_chars += len(item.text)
@@ -189,7 +201,11 @@ class AnalystAgent:
         return added
 
     def _finish(
-        self, run_id: str, state: AgentState, answer: str, reason: str
+        self,
+        run_id: str,
+        state: AgentState,
+        answer: str,
+        reason: TerminationReason,
     ) -> AnalystAnswer:
         self._trace(TraceEvent(
             run_id,

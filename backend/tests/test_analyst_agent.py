@@ -3,6 +3,7 @@ import unittest
 from dataclasses import dataclass
 
 from app.agent.agent import AnalystAgent
+from app.agent.config import AgentConfig
 from app.agent.constants import INSUFFICIENT_EVIDENCE_MESSAGE
 from app.agent.models import ModelDecision
 
@@ -121,7 +122,7 @@ class AnalystAgentTests(unittest.IsolatedAsyncioTestCase):
         result = await AnalystAgent(
             model,
             mcp,
-            max_tool_calls=3,
+            config=AgentConfig(max_tool_calls=3),
             trace_recorder=recorder,
         ).run("Question")
 
@@ -380,7 +381,7 @@ class AnalystAgentTests(unittest.IsolatedAsyncioTestCase):
         result = await AnalystAgent(
             model,
             mcp,
-            max_total_evidence_chars=5,
+            config=AgentConfig(max_evidence_characters=5),
         ).run("Question")
 
         self.assertEqual([item.text for item in result.evidence], ["1234"])

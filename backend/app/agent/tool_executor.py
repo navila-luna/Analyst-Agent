@@ -1,6 +1,7 @@
 import json
 from typing import Any
 
+from app.agent.enums import AgentAction
 from app.agent.protocols import MCPClient
 from app.agent.models import ModelDecision, ToolRequest
 from app.document_repository import MAX_CHUNKS_PER_READ
@@ -15,7 +16,7 @@ class ToolExecutor:
         decision: ModelDecision,
         question: str,
     ) -> ToolRequest:
-        if decision.action == "SEARCH":
+        if decision.action == AgentAction.SEARCH:
             return ToolRequest(
                 name="search_documents",
                 arguments={
@@ -23,13 +24,13 @@ class ToolExecutor:
                 },
             )
 
-        if decision.action == "LIST":
+        if decision.action == AgentAction.LIST:
             return ToolRequest(
                 name="list_documents",
                 arguments={},
             )
 
-        if decision.action == "READ":
+        if decision.action == AgentAction.READ:
             return ToolRequest(
                 name="read_document",
                 arguments={
