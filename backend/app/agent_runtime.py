@@ -4,7 +4,8 @@ from pathlib import Path
 
 from mcp import Client, StdioServerParameters
 from openai import AsyncOpenAI
-from app.analyst_agent import AnalystAgent
+
+from app.agent.agent import AnalystAgent
 from app.agent.openai_model import OpenAIAnalystModel
 
 BACKEND_DIR = Path(__file__).parent.parent

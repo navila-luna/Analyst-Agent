@@ -2,11 +2,9 @@ import json
 import unittest
 from dataclasses import dataclass
 
-from app.analyst_agent import (
-    INSUFFICIENT_EVIDENCE_MESSAGE,
-    AnalystAgent,
-    ModelDecision,
-)
+from app.agent.agent import AnalystAgent
+from app.agent.constants import INSUFFICIENT_EVIDENCE_MESSAGE
+from app.agent.models import ModelDecision
 
 
 @dataclass

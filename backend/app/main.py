@@ -8,8 +8,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app import models  # noqa: F401 - registers models with Base.metadata
+from app.agent.agent import AnalystAgent
 from app.agent_runtime import analyst_agent_runtime
-from app.analyst_agent import AnalystAgent
 from app.config_store import get_or_create_config
 from app.db import Base, engine, get_db
 from app.index import index_folder

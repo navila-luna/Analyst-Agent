@@ -2,7 +2,7 @@ import unittest
 
 from httpx import ASGITransport, AsyncClient
 
-from app.analyst_agent import AnalystAnswer, Evidence
+from app.agent.models import AnalystAnswer, Evidence
 from app.main import app, get_analyst_agent
 
 
